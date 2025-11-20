@@ -1,0 +1,62 @@
+﻿@model IEnumerable<Flow_App.Models.TaskItem>
+
+@{
+    ViewData["Title"] = "Task Calendar";
+}
+
+<h2 class="mb-3">Task Calendar</h2>
+
+<div id="calendar"></div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var calendarEl = document.getElementById('calendar');
+
+            var tasks = [
+                @foreach (var task in Model)
+                {
+                        if (task.DueDate.HasValue)
+                        {
+                                <text>
+                                {
+                                    id: '@task.Id',
+                                    title: '@task.Title', // keep this for clickable
+                                    course: '@task.Course?.Name',
+                                    priority: '@task.Priority',
+                                    start: '@task.DueDate.Value.ToString("yyyy-MM-dd")',
+                                    url: '/Tasks/Edit/@task.Id'
+                                },
+                                </text>
+                        }
+                }
+            ];
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 750,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: tasks,
+                eventDidMount: function(info) {
+                    // Add line breaks inside the event element
+                    var el = info.el.querySelector('.fc-event-title');
+                    if(el) {
+                        el.innerHTML = `
+                            <b>${info.event.title}</b><br/>
+                            Course: ${info.event.extendedProps.course}<br/>
+                            Priority: ${info.event.extendedProps.priority}
+                        `;
+                    }
+                }
+            });
+
+            calendar.render();
+        });
+    </script>
+}
+
+

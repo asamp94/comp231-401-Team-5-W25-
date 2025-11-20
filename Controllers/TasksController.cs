@@ -120,5 +120,18 @@ namespace Flow_App.Controllers
 
             return RedirectToAction(nameof(Index));
         }
+
+        //Calendar action 
+        public async Task<IActionResult> Calendar()
+        {
+            var tasks = await _context.Tasks
+                .Include(t => t.Course)
+                .Where(t => t.DueDate != null)
+                .ToListAsync();
+
+            return View(tasks);
+        }
+
+
     }
 }
