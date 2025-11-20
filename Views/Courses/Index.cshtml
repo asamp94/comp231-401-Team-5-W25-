@@ -1,0 +1,44 @@
+﻿@model IEnumerable<Flow_App.Models.Course>
+
+@{
+    ViewData["Title"] = "Courses";
+}
+
+<h1>My Courses</h1>
+
+<p>
+    <a asp-action="Create" class="btn btn-primary">Create New Course</a>
+    <a asp-controller="Tasks" asp-action="Index" class="btn btn-secondary">Back to Tasks</a>
+</p>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-warning">
+        No courses found. <a asp-action="Create">Create your first course!</a>
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var course in Model)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">@course.Name</h5>
+                        <p class="card-text">
+                            <span class="badge bg-primary">@course.Tasks.Count task(s)</span>
+                        </p>
+                        <div class="btn-group" role="group">
+                            <a asp-action="Details" asp-route-id="@course.Id" class="btn btn-sm btn-info">View Tasks</a>
+                            <a asp-action="Edit" asp-route-id="@course.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a asp-action="Delete" asp-route-id="@course.Id"
+                               class="btn btn-sm btn-outline-danger"
+                               onclick="return confirm('Are you sure? This will unassign all tasks from this course.')">Delete</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

@@ -3,15 +3,14 @@ using System.Threading.Tasks;
 using Flow_App.Data;
 using Flow_App.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace Flow_App.Controllers
-
-    /*  TasksController handles all task-related webpage actions. It connects ot the database using FlowContext and lets users view, create, edit, and delete tasks. 
-     *  Each public method represents a page or action in the Tasks section.
-     * 
-     */
 {
+    /*  TasksController handles all task-related webpage actions. It connects to the database using FlowContext 
+     *  and lets users view, create, edit, and delete tasks with course filtering support.
+     */
     public class TasksController : Controller
     {
         private readonly FlowContext _context;
@@ -21,24 +20,42 @@ namespace Flow_App.Controllers
             _context = context;
         }
 
-        //Retrieves all tasks from the database
-        public async Task<IActionResult> Index()
+        // Retrieves all tasks from the database with optional course filter
+        public async Task<IActionResult> Index(int? courseId)
         {
-            var tasks = await _context.Tasks
+            var tasksQuery = _context.Tasks
+                .Include(t => t.Course)
+                .AsQueryable();
+
+            // Filter by course if courseId is provided
+            if (courseId.HasValue)
+            {
+                tasksQuery = tasksQuery.Where(t => t.CourseId == courseId.Value);
+                var course = await _context.Courses.FindAsync(courseId.Value);
+                ViewData["FilteredCourse"] = course?.Name;
+            }
+
+            var tasks = await tasksQuery
                 .OrderByDescending(t => t.Priority)
                 .ThenBy(t => t.DueDate)
                 .ToListAsync();
 
+            // Pass list of courses for filter dropdown
+            ViewBag.Courses = await _context.Courses.ToListAsync();
+            ViewBag.SelectedCourseId = courseId;
+
             return View(tasks);
         }
 
-        //Shows empty form for user to enter a new task
-        public IActionResult Create()
+        // Shows empty form for user to enter a new task
+        public async Task<IActionResult> Create()
         {
+            // Load courses for dropdown
+            ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name");
             return View();
         }
 
-        //Takes the submitted tasks form data and saves it to the database, then returning to task list
+        // Takes the submitted task form data and saves it to the database
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(TaskItem taskItem)
@@ -50,10 +67,12 @@ namespace Flow_App.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            // Reload courses if validation fails
+            ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name");
             return View(taskItem);
         }
 
-       //Finds task by ID and displays it
+        // Finds task by ID and displays it
         public async Task<IActionResult> Edit(int id)
         {
             var task = await _context.Tasks.FindAsync(id);
@@ -62,10 +81,12 @@ namespace Flow_App.Controllers
                 return NotFound();
             }
 
+            // Load courses for dropdown
+            ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name", task.CourseId);
             return View(task);
         }
 
-        //updates edited task in the database
+        // Updates edited task in the database
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, TaskItem taskItem)
@@ -82,10 +103,12 @@ namespace Flow_App.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            // Reload courses if validation fails
+            ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name", taskItem.CourseId);
             return View(taskItem);
         }
 
-        // Removes the selected task from the database by ID.
+        // Removes the selected task from the database by ID
         public async Task<IActionResult> Delete(int id)
         {
             var task = await _context.Tasks.FindAsync(id);

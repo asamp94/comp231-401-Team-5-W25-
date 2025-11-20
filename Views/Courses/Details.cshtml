@@ -1,0 +1,80 @@
+﻿@model Flow_App.Models.Course
+
+@{
+    ViewData["Title"] = "Course Details";
+}
+
+<h1>@Model.Name</h1>
+
+<p>
+    <a asp-controller="Tasks" asp-action="Index" asp-route-courseId="@Model.Id" class="btn btn-primary">View All Tasks for This Course</a>
+    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">Edit Course</a>
+    <a asp-action="Index" class="btn btn-secondary">Back to Courses</a>
+</p>
+
+<hr />
+
+<h3>Tasks in This Course (@Model.Tasks.Count)</h3>
+
+@if (!Model.Tasks.Any())
+{
+    <div class="alert alert-info">
+        No tasks assigned to this course yet.
+        <a asp-controller="Tasks" asp-action="Create">Create a task</a> and assign it to this course.
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Due Date</th>
+                <th>Priority</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var task in Model.Tasks.OrderByDescending(t => t.Priority).ThenBy(t => t.DueDate))
+            {
+                <tr>
+                    <td>
+                        <strong>@task.Title</strong>
+                        @if (!string.IsNullOrEmpty(task.Description))
+                        {
+                            <br />
+                            <small class="text-muted">@task.Description</small>
+                        }
+                    </td>
+                    <td>
+                        @if (task.DueDate.HasValue)
+                        {
+                            @task.DueDate.Value.ToString("MMM dd, yyyy")
+                        }
+                        else
+                        {
+                            <span class="text-muted">No due date</span>
+                        }
+                    </td>
+                    <td>
+                        @switch (task.Priority)
+                        {
+                            case Flow_App.Models.TaskPriority.High:
+                                <span class="badge bg-danger">High</span>
+                                break;
+                            case Flow_App.Models.TaskPriority.Medium:
+                                <span class="badge bg-warning">Medium</span>
+                                break;
+                            case Flow_App.Models.TaskPriority.Low:
+                                <span class="badge bg-secondary">Low</span>
+                                break;
+                        }
+                    </td>
+                    <td>
+                        <a asp-controller="Tasks" asp-action="Edit" asp-route-id="@task.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
