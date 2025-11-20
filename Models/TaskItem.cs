@@ -11,7 +11,7 @@ namespace Flow_App.Models
         public string Title { get; set; } = "";  
 
         public string? Description { get; set; }      
-        [DataType(DataType.Date)]
+        
         public DateTime? DueDate { get; set; }        
 
         public TaskPriority Priority { get; set; } = TaskPriority.Medium;
@@ -19,5 +19,9 @@ namespace Flow_App.Models
        
         public int? CourseId { get; set; }
         public Course? Course { get; set; }
+
+       // public bool ReminderEnabled { get; set; } = false;
+        //public int ReminderMinutesBefore { get; set; } = 60; //default of 1 hour
+
     }
 }

@@ -3,6 +3,24 @@
 @{
     ViewData["Title"] = "Task Calendar";
 }
+<style>
+/* allow event text to wrap instead of stretching */
+.fc-event {
+    white-space: normal !important; /* allow wrapping */
+    word-break: break-word;          /* break long words if needed */
+}
+
+/* make month view titles fit nicely */
+.fc-daygrid-event .fc-event-title {
+    line-height: 1.2em;
+}
+
+/* improve day/time grid view wrapping */
+.fc-timegrid-event .fc-event-title {
+    white-space: normal !important;
+    line-height: 1.2em;
+}
+</style>
 
 <h2 class="mb-3">Task Calendar</h2>
 
@@ -11,21 +29,31 @@
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+
             var calendarEl = document.getElementById('calendar');
 
+            // Build tasks array with color coding
             var tasks = [
                 @foreach (var task in Model)
                 {
                         if (task.DueDate.HasValue)
                         {
+                                var color = task.Priority switch
+                                {
+                                        Flow_App.Models.TaskPriority.High => "red",
+                                        Flow_App.Models.TaskPriority.Medium => "orange",
+                                        Flow_App.Models.TaskPriority.Low => "green",
+                                        _ => "blue"
+                                };
                                 <text>
                                 {
                                     id: '@task.Id',
-                                    title: '@task.Title', // keep this for clickable
+                                    title: '@task.Title',
                                     course: '@task.Course?.Name',
                                     priority: '@task.Priority',
-                                    start: '@task.DueDate.Value.ToString("yyyy-MM-dd")',
-                                    url: '/Tasks/Edit/@task.Id'
+                                    start: '@task.DueDate.Value.ToString("yyyy-MM-ddTHH:mm:ss")',
+                                    url: '/Tasks/Edit/@task.Id',
+                                    color: '@color'
                                 },
                                 </text>
                         }
@@ -41,22 +69,42 @@
                     right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 },
                 events: tasks,
+                displayEventTime: false, // hide default time in day/week views
+                dateClick: function(info) {
+                    calendar.changeView('timeGridDay', info.dateStr);
+                },
                 eventDidMount: function(info) {
-                    // Add line breaks inside the event element
                     var el = info.el.querySelector('.fc-event-title');
                     if(el) {
-                        el.innerHTML = `
-                            <b>${info.event.title}</b><br/>
-                            Course: ${info.event.extendedProps.course}<br/>
-                            Priority: ${info.event.extendedProps.priority}
-                        `;
+                        if(info.view.type.startsWith('timeGrid')) {
+                            // Format time as HH:mm AM/PM
+                            var hours = info.event.start.getHours();
+                            var minutes = info.event.start.getMinutes();
+                            var ampm = hours >= 12 ? 'PM' : 'AM';
+                            hours = hours % 12;
+                            hours = hours ? hours : 12;
+                            var minutesStr = minutes < 10 ? '0'+minutes : minutes;
+                            var timeStr = hours + ':' + minutesStr + ' ' + ampm;
+
+                            // Day view formatting: Time : Course on top, Task title below
+                            el.innerHTML = `
+                                ${timeStr} : ${info.event.extendedProps.course}<br/>
+                                ${info.event.title}
+                            `;
+                        } else {
+                            // Month view formatting: multi-line task info
+                            el.innerHTML = `
+                                <b>${info.event.title}</b><br/>
+                                Course: ${info.event.extendedProps.course}<br/>
+                                Priority: ${info.event.extendedProps.priority}
+                            `;
+                        }
                     }
                 }
             });
 
             calendar.render();
         });
+
     </script>
 }
-
-
