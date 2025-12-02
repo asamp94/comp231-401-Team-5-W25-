@@ -124,4 +124,93 @@ else
             }
         </tbody>
     </table>
+
+    @section Scripts {
+        <script>
+            @if (ViewBag.TasksWithReminder != null)
+            {
+                    @:const tasksData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.TasksWithReminder));
+                    @:
+                    @:function getShownNotifications() {
+                    @:    try {
+                    @:        const shown = localStorage.getItem('shownTaskNotifications');
+                    @:        if (!shown) return {};
+                    @:        const parsed = JSON.parse(shown);
+                    @:        const cleaned = {};
+                    @:        for (const [key, value] of Object.entries(parsed)) {
+                    @:            if (key.includes('_')) cleaned[key] = value;
+                    @:        }
+                    @:        if (Object.keys(cleaned).length !== Object.keys(parsed).length) {
+                    @:            localStorage.setItem('shownTaskNotifications', JSON.stringify(cleaned));
+                    @:        }
+                    @:        return cleaned;
+                    @:    } catch (e) { return {}; }
+                    @:}
+                    @:
+                    @:function markNotificationAsShown(taskId, reminderTime) {
+                    @:    try {
+                    @:        const shown = getShownNotifications();
+                    @:        const key = taskId + "_" + reminderTime;
+                    @:        shown[key] = new Date().toISOString();
+                    @:        localStorage.setItem('shownTaskNotifications', JSON.stringify(shown));
+                    @:    } catch (e) { }
+                    @:}
+                    @:
+                    @:function hasNotificationBeenShown(taskId, reminderTime) {
+                    @:    const shown = getShownNotifications();
+                    @:    const key = taskId + "_" + reminderTime;
+                    @:    return key in shown;
+                    @:}
+                    @:
+                    @:function showOverlayNotification(title, body) {
+                    @:    const container = document.getElementById("notificationContainer");
+                    @:    if (!container) return;
+                    @:    const notif = document.createElement("div");
+                    @:    notif.className = "task-notification alert alert-warning shadow";
+                    @:    notif.style.cssText = "margin-bottom: 10px; animation: slideIn 0.5s ease-out;";
+                    @:    notif.innerHTML = "<strong>⏰ " + title + "</strong><p style='margin-bottom: 0; margin-top: 5px;'>" + (body || '') + "</p>";
+                    @:    container.appendChild(notif);
+                    @:    setTimeout(() => {
+                    @:        notif.style.animation = "slideOut 0.3s ease-out";
+                    @:        setTimeout(() => { if (container.contains(notif)) container.removeChild(notif); }, 300);
+                    @:    }, 10000);
+                    @:}
+                    @:
+                    @:function showBrowserNotification(title, body, taskId, reminderTime) {
+                    @:    if ("Notification" in window && Notification.permission === "granted") {
+                    @:        new Notification("⏰ " + title, { body: body || 'Task reminder', icon: "/icon.png", requireInteraction: false });
+                    @:    }
+                    @:    showOverlayNotification(title, body);
+                    @:    markNotificationAsShown(taskId, reminderTime);
+                    @:}
+                    @:
+                    @:if ("Notification" in window && Notification.permission === "default") {
+                    @:    Notification.requestPermission();
+                    @:}
+                    @:
+                    @:const now = new Date();
+                    @:tasksData.forEach(task => {
+                    @:    if (!task.reminderEnabled || !task.reminderTime) return;
+                    @:    const reminderDate = new Date(task.reminderTime);
+                    @:    const delay = reminderDate - now;
+                    @:    const reminderTimeStr = task.reminderTime;
+                    @:    if (hasNotificationBeenShown(task.id, reminderTimeStr)) return;
+                    @:    if (delay <= 0 && delay > -86400000) {
+                    @:        const hoursAgo = Math.abs(Math.floor(delay / 3600000));
+                    @:        const minutesAgo = Math.abs(Math.floor((delay % 3600000) / 60000));
+                    @:        let timeMsg = hoursAgo > 0 ? "Due " + hoursAgo + " hour" + (hoursAgo > 1 ? 's' : '') + " ago" : minutesAgo > 0 ? "Due " + minutesAgo + " minute" + (minutesAgo > 1 ? 's' : '') + " ago" : 'Due now';
+                    @:        const message = task.description ? task.description + " - " + timeMsg : timeMsg;
+                    @:        showBrowserNotification(task.title, message, task.id, reminderTimeStr);
+                    @:    } else if (delay > 0 && delay <= 3600000) {
+                    @:        setTimeout(() => {
+                    @:            if (!hasNotificationBeenShown(task.id, reminderTimeStr)) {
+                    @:                showBrowserNotification(task.title, task.description || 'Task is due soon', task.id, reminderTimeStr);
+                    @:            }
+                    @:        }, delay);
+                    @:    }
+                    @:});
+            }
+        </script>
+    }
+    
 }

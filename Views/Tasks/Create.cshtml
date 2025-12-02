@@ -2,23 +2,30 @@
 @{
     ViewData["Title"] = "Create Task";
 }
+
 <h1>Create Task</h1>
+
 <form asp-action="Create" method="post">
-    <div class="form-group">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="form-group mb-3">
         <label asp-for="Title"></label>
         <input asp-for="Title" class="form-control" />
         <span asp-validation-for="Title" class="text-danger"></span>
     </div>
-    <div class="form-group">
+
+    <div class="form-group mb-3">
         <label asp-for="Description"></label>
-        <textarea asp-for="Description" class="form-control"></textarea>
+        <textarea asp-for="Description" class="form-control" rows="4"></textarea>
     </div>
-    <div class="form-group">
+
+    <div class="form-group mb-3">
         <label asp-for="DueDate"></label>
         <input asp-for="DueDate" type="datetime-local" class="form-control" />
-
+        <span asp-validation-for="DueDate" class="text-danger"></span>
     </div>
-    <div class="form-group">
+
+    <div class="form-group mb-3">
         <label asp-for="Priority"></label>
         <select asp-for="Priority" class="form-control">
             <option value="2">High</option>
@@ -27,18 +34,50 @@
         </select>
     </div>
 
-    <!-- Course dropdown for Story S3 / Course editing -->
-    <div class="form-group">
+    <div class="form-group mb-3">
         <label asp-for="CourseId">Course (Optional)</label>
         <select asp-for="CourseId" class="form-control" asp-items="ViewBag.Courses">
             <option value="">-- No Course --</option>
         </select>
-        <span asp-validation-for="CourseId" class="text-danger"></span>
+    </div>
+
+    <!-- Reminder Fields -->
+    <div class="form-group mb-3">
+        <div class="form-check">
+            <input asp-for="ReminderEnabled" class="form-check-input" type="checkbox" id="ReminderEnabled" />
+            <label asp-for="ReminderEnabled" class="form-check-label">Enable Reminder</label>
+        </div>
+    </div>
+
+    <div class="form-group mb-3" id="reminderDiv">
+        <label>Remind me:</label>
+        <div class="input-group">
+            <input asp-for="ReminderValue" class="form-control" type="number" min="1" />
+            <select asp-for="ReminderUnit" class="form-select">
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+            </select>
+        </div>
     </div>
 
     <button type="submit" class="btn btn-primary">Save</button>
     <a asp-action="Index" class="btn btn-secondary">Cancel</a>
 </form>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        const reminderCheckbox = document.getElementById("ReminderEnabled");
+        const reminderDiv = document.getElementById("reminderDiv");
+
+        function toggleReminderDiv() {
+            reminderDiv.style.display = reminderCheckbox.checked ? "block" : "none";
+        }
+
+        if (reminderCheckbox && reminderDiv) {
+            reminderCheckbox.addEventListener("change", toggleReminderDiv);
+            toggleReminderDiv(); // initial state
+        }
+    </script>
 }

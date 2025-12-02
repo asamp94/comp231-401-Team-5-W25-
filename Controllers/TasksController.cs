@@ -8,8 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Flow_App.Controllers
 {
-    /*  TasksController handles all task-related webpage actions. It connects to the database using FlowContext 
-     *  and lets users view, create, edit, and delete tasks with course filtering support.
+    /* TasksController handles all task-related webpage actions. It connects to the database using FlowContext 
+     * and lets users view, create, edit, and delete tasks with course filtering support.
      */
     public class TasksController : Controller
     {
@@ -20,14 +20,12 @@ namespace Flow_App.Controllers
             _context = context;
         }
 
-        // Retrieves all tasks from the database with optional course filter
         public async Task<IActionResult> Index(int? courseId)
         {
             var tasksQuery = _context.Tasks
                 .Include(t => t.Course)
                 .AsQueryable();
 
-            // Filter by course if courseId is provided
             if (courseId.HasValue)
             {
                 tasksQuery = tasksQuery.Where(t => t.CourseId == courseId.Value);
@@ -40,26 +38,64 @@ namespace Flow_App.Controllers
                 .ThenBy(t => t.DueDate)
                 .ToListAsync();
 
-            // Pass list of courses for filter dropdown
             ViewBag.Courses = await _context.Courses.ToListAsync();
             ViewBag.SelectedCourseId = courseId;
+
+            // Get ALL tasks with reminders - use explicit property names for JavaScript compatibility
+            var allTasksWithReminders = await _context.Tasks
+                .Where(t => t.ReminderEnabled && t.DueDate.HasValue)
+                .Select(t => new
+                {
+                    id = t.Id,
+                    title = t.Title,
+                    description = t.Description,
+                    reminderEnabled = t.ReminderEnabled,
+                    dueDate = t.DueDate.Value,
+                    reminderMinutesBefore = t.ReminderMinutesBefore,
+                    reminderTime = t.DueDate.Value.AddMinutes(-t.ReminderMinutesBefore)
+                })
+                .ToListAsync();
+
+            // Debug: Log to console
+            System.Diagnostics.Debug.WriteLine($"Found {allTasksWithReminders.Count} tasks with reminders");
+            foreach (var task in allTasksWithReminders)
+            {
+                System.Diagnostics.Debug.WriteLine($"Task: {task.title}, Reminder Time: {task.reminderTime}");
+            }
+
+            ViewBag.TasksWithReminder = allTasksWithReminders;
 
             return View(tasks);
         }
 
-        // Shows empty form for user to enter a new task
+
+        // Shows empty form for creating a new task
         public async Task<IActionResult> Create()
         {
-            // Load courses for dropdown
             ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name");
             return View();
         }
 
-        // Takes the submitted task form data and saves it to the database
+        // Handles POST of new task
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(TaskItem taskItem)
         {
+            if (taskItem.ReminderEnabled)
+            {
+                taskItem.ReminderMinutesBefore = taskItem.ReminderUnit switch
+                {
+                    "minutes" => taskItem.ReminderValue,
+                    "hours" => taskItem.ReminderValue * 60,
+                    "days" => taskItem.ReminderValue * 60 * 24,
+                    _ => 60
+                };
+            }
+            else
+            {
+                taskItem.ReminderMinutesBefore = 0;
+            }
+
             if (ModelState.IsValid)
             {
                 _context.Add(taskItem);
@@ -67,33 +103,70 @@ namespace Flow_App.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // Reload courses if validation fails
             ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name");
             return View(taskItem);
         }
 
-        // Finds task by ID and displays it
+        // Shows existing task for editing
         public async Task<IActionResult> Edit(int id)
         {
             var task = await _context.Tasks.FindAsync(id);
-            if (task == null)
+            if (task == null) return NotFound();
+
+            // Convert minutes to value/unit for UI - prioritize smallest reasonable unit
+            if (task.ReminderMinutesBefore > 0)
             {
-                return NotFound();
+                // Only use days if it's an exact number of days AND >= 1 day
+                if (task.ReminderMinutesBefore >= 1440 && task.ReminderMinutesBefore % 1440 == 0)
+                {
+                    task.ReminderValue = task.ReminderMinutesBefore / 1440;
+                    task.ReminderUnit = "days";
+                }
+                // Only use hours if it's an exact number of hours AND >= 1 hour
+                else if (task.ReminderMinutesBefore >= 60 && task.ReminderMinutesBefore % 60 == 0)
+                {
+                    task.ReminderValue = task.ReminderMinutesBefore / 60;
+                    task.ReminderUnit = "hours";
+                }
+                // Otherwise use minutes
+                else
+                {
+                    task.ReminderValue = task.ReminderMinutesBefore;
+                    task.ReminderUnit = "minutes";
+                }
+                task.ReminderEnabled = true;
+            }
+            else
+            {
+                // Default values when no reminder is set
+                task.ReminderValue = 60;
+                task.ReminderUnit = "minutes";
             }
 
-            // Load courses for dropdown
             ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name", task.CourseId);
             return View(task);
         }
 
-        // Updates edited task in the database
+        // Handles POST of edited task
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, TaskItem taskItem)
         {
-            if (id != taskItem.Id)
+            if (id != taskItem.Id) return NotFound();
+
+            if (taskItem.ReminderEnabled)
             {
-                return NotFound();
+                taskItem.ReminderMinutesBefore = taskItem.ReminderUnit switch
+                {
+                    "minutes" => taskItem.ReminderValue,
+                    "hours" => taskItem.ReminderValue * 60,
+                    "days" => taskItem.ReminderValue * 60 * 24,
+                    _ => 60
+                };
+            }
+            else
+            {
+                taskItem.ReminderMinutesBefore = 0;
             }
 
             if (ModelState.IsValid)
@@ -103,12 +176,11 @@ namespace Flow_App.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // Reload courses if validation fails
             ViewBag.Courses = new SelectList(await _context.Courses.ToListAsync(), "Id", "Name", taskItem.CourseId);
             return View(taskItem);
         }
 
-        // Removes the selected task from the database by ID
+        // Deletes a task by ID
         public async Task<IActionResult> Delete(int id)
         {
             var task = await _context.Tasks.FindAsync(id);
@@ -121,7 +193,7 @@ namespace Flow_App.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        //Calendar action 
+        // Calendar view with tasks that have a due date
         public async Task<IActionResult> Calendar()
         {
             var tasks = await _context.Tasks
@@ -132,6 +204,27 @@ namespace Flow_App.Controllers
             return View(tasks);
         }
 
+        private void PrepareTasksForReminders()
+        {
+            // Get tasks with reminders enabled
+            var tasks = _context.Tasks
+                .Where(t => t.ReminderEnabled && t.DueDate != null)
+                .Select(t => new
+                {
+                    t.Title,
+                    t.Description,
+                    // Calculate exact reminder time
+                    ReminderTime = t.DueDate.Value.AddMinutes(-t.ReminderMinutesBefore)
+                })
+                .ToList();
+
+            ViewBag.TasksWithReminders = tasks.Select(t => new
+            {
+                title = t.Title,
+                description = t.Description,
+                reminderTime = t.ReminderTime.ToString("o") // ISO format for JS
+            }).ToList();
+        }
 
     }
 }
