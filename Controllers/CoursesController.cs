@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Flow_App.Controllers
-{
+{   //
     /*  CoursesController handles all course-related webpage actions.
      *  Allows users to view, create, edit, and delete courses.
      */
